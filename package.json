@@ -2,9 +2,18 @@
   "name": "@twilio-labs/languagetool-cli",
   "version": "1.0.0",
   "description": "Run LanguageTool for linting Markdown files during CI",
+  "keywords": [
+    "languagetool",
+    "cli"
+  ],
   "repository": "https://github.com/twilio-labs/languagetool-cli",
-  "author": "Twilio",
+  "author": "Twilio Labs",
   "license": "MIT",
+  "private": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "type": "module",
   "main": "dist/index.js",
   "bin": {
