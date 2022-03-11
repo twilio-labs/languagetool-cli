@@ -18,6 +18,6 @@ jobs:
           registry-url: https://registry.npmjs.org/
       - run: yarn
       - run: yarn build
-      - run: yarn publish --tag $(node getPkgTag.js) --non-interactive
+      - run: yarn publish --tag $(node getPkgTag.cjs) --non-interactive
         env:
           NODE_AUTH_TOKEN: ${{secrets.npm_token}}
