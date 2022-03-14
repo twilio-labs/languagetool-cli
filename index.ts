@@ -2,7 +2,7 @@ import * as builder from "annotatedtext-remark";
 import ora from "ora";
 import { loadFiles } from "./lib/files.js";
 import { createFetchRequest } from "./lib/languageToolClient.js";
-import { generateReport } from "./lib/report.js";
+import { generateReport, reporters } from "./lib/report.js";
 import { LanguageToolResult } from "./lib/types.js";
 
 const spinner = ora("Processing...\n").start();
@@ -16,6 +16,14 @@ run()
   });
 
 async function run() {
+  let nArgOffset = 2;
+  let gitHubActionsOutput = false;
+
+  if (process.argv[nArgOffset].toLowerCase() === "--githubactions") {
+    nArgOffset++;
+    gitHubActionsOutput = true;
+  }
+
   const files = await loadFiles(process.argv.slice(2));
   const annotatedItems = files.map((file) => ({
     file,
@@ -32,5 +40,10 @@ async function run() {
     };
   });
 
-  correlatedResults.forEach(generateReport);
+  correlatedResults.forEach((result) => {
+    generateReport(
+      result,
+      gitHubActionsOutput ? reporters.githubactions : reporters.markdown
+    );
+  });
 }

@@ -1,12 +1,71 @@
 import { location } from "vfile-location";
 import { LanguageToolResult } from "./types.js";
 
-export function generateReport(result: LanguageToolResult) {
+export const reporters = {
+  markdown: {
+    noIssues: (result: LanguageToolResult) => {
+      return `- [X] **${result.path}** has no issues.\n\n`;
+    },
+    issue: (
+      result: LanguageToolResult,
+      line: number,
+      column: number,
+      message: string,
+      contextHighlighted: string,
+      contextPrefix: string,
+      contextPostfix: string,
+      replacements: string
+    ) => {
+      return (
+        `- [ ] **${result.path}** \`(${line},${column})\` - _${message}_\n\n` +
+        "  ```diff\n" +
+        `  - «${contextHighlighted}»\n` +
+        (replacements.length
+          ? `  + Possible replacements: «${replacements}»\n`
+          : "") +
+        `  # Context: «${contextPrefix}**${contextHighlighted}**${contextPostfix}»\n` +
+        "  ```\n\n"
+      );
+    },
+  },
+  githubactions: {
+    noIssues: () => {
+      return "";
+    },
+    issue: (
+      result: LanguageToolResult,
+      line: number,
+      column: number,
+      message: string,
+      contextHighlighted: string,
+      contextPrefix: string,
+      contextPostfix: string,
+      replacements: string
+    ) => {
+      return (
+        `::warning title=${message},file=${
+          result.path
+        },line=${line},col=${column},endColumn=${
+          column + contextHighlighted.length
+        }::` +
+        (replacements.length
+          ? `Possible replacements: «${replacements}»\n`
+          : "") +
+        "\n\n"
+      );
+    },
+  },
+};
+
+export function generateReport(
+  result: LanguageToolResult,
+  reporter = reporters.markdown
+) {
   const matches = result.matches;
   const matchesTotal = matches.length;
 
   if (!matchesTotal) {
-    console.log(`- [X] **${result.path}** has no issues.\n`);
+    process.stdout.write(reporter.noIssues(result));
     return;
   }
 
@@ -28,16 +87,17 @@ export function generateReport(result: LanguageToolResult) {
       ctx.offset + ctx.length
     );
 
-    const message = match.message.replace(/(\s{2})/g, "");
-    console.log(
-      `- [ ] **${result.path}** \`(${line},${column})\` - _${message}_\n\n` +
-        "  ```diff\n" +
-        `  - «${contextHighlighted}»\n` +
-        (replacements.length
-          ? `  + Possible replacements: «${replacements}»\n`
-          : "") +
-        `  # Context: «${contextPrefix}**${contextHighlighted}**${contextPostfix}»\n` +
-        "  ```\n"
+    process.stdout.write(
+      reporter.issue(
+        result,
+        line,
+        column,
+        match.message.replace(/(\s{2})/g, ""),
+        contextHighlighted,
+        contextPrefix,
+        contextPostfix,
+        replacements
+      )
     );
   });
 }
