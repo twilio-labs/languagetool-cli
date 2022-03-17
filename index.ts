@@ -1,9 +1,9 @@
-import * as builder from "annotatedtext-remark";
 import ora from "ora";
 import { loadFiles } from "./lib/files.js";
 import { createFetchRequest } from "./lib/languageToolClient.js";
 import { generateReport, reporters } from "./lib/report.js";
 import { LanguageToolResult } from "./lib/types.js";
+import { convertMarkdownToAnnotated } from "./lib/markdownToAnnotated.js";
 
 const spinner = ora("Processing...\n").start();
 run()
@@ -25,9 +25,10 @@ async function run() {
   }
 
   const files = await loadFiles(process.argv.slice(2));
+
   const annotatedItems = files.map((file) => ({
     file,
-    annotatedText: builder.build(file.contents, undefined),
+    annotatedText: convertMarkdownToAnnotated(file.contents),
   }));
 
   const responses = await Promise.all(annotatedItems.map(createFetchRequest));
