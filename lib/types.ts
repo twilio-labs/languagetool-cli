@@ -1,11 +1,23 @@
+export interface AnnotatedTextItemOffset {
+  start: number;
+  end: number;
+}
+
+export interface AnnotatedTextItem {
+  interpretAs?: string;
+  markup?: string;
+  offset: AnnotatedTextItemOffset;
+  text?: string;
+}
+
+export interface AnnotatedText {
+  annotation: AnnotatedTextItem[];
+}
+
 export interface LoadFileResponse {
   contents: string;
   path: string;
-}
-
-export interface AnnotatedItem {
-  file: LoadFileResponse;
-  annotatedText: any;
+  annotatedText?: AnnotatedText;
 }
 
 export interface LanguageToolReplacement {
@@ -50,4 +62,21 @@ export interface LanguageToolMatch {
 
 export interface LanguageToolResult extends LoadFileResponse {
   matches: LanguageToolMatch[];
+}
+
+export interface ReporterItem {
+  result: LanguageToolResult;
+  line: number;
+  column: number;
+  message: string;
+  contextHighlighted: string;
+  contextPrefix: string;
+  contextPostfix: string;
+  replacements: string[];
+  suggestedLine: string;
+}
+export interface Reporter {
+  noIssues(result: LanguageToolResult): string;
+  issue(item: ReporterItem): string | Promise<void>;
+  complete?(): Promise<void>;
 }
