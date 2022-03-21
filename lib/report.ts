@@ -1,63 +1,16 @@
 import { location } from "vfile-location";
 import { LanguageToolResult } from "./types.js";
+import { githubReporter } from "./githubReporter.js";
+import { markdownReporter } from "./markdownReporter.js";
+import { githubActionsReporter } from "./githubActionsReporter.js";
 
 export const reporters = {
-  markdown: {
-    noIssues: (result: LanguageToolResult) => {
-      return `- [X] **${result.path}** has no issues.\n\n`;
-    },
-    issue: (
-      result: LanguageToolResult,
-      line: number,
-      column: number,
-      message: string,
-      contextHighlighted: string,
-      contextPrefix: string,
-      contextPostfix: string,
-      replacements: string
-    ) => {
-      return (
-        `- [ ] **${result.path}** \`(${line},${column})\` - _${message}_\n\n` +
-        "  ```diff\n" +
-        `  - «${contextHighlighted}»\n` +
-        (replacements.length
-          ? `  + Possible replacements: «${replacements}»\n`
-          : "") +
-        `  # Context: «${contextPrefix}**${contextHighlighted}**${contextPostfix}»\n` +
-        "  ```\n\n"
-      );
-    },
-  },
-  githubactions: {
-    noIssues: () => {
-      return "";
-    },
-    issue: (
-      result: LanguageToolResult,
-      line: number,
-      column: number,
-      message: string,
-      contextHighlighted: string,
-      contextPrefix: string,
-      contextPostfix: string,
-      replacements: string
-    ) => {
-      return (
-        `::warning title=${message},file=${
-          result.path
-        },line=${line},col=${column},endColumn=${
-          column + contextHighlighted.length
-        }::` +
-        (replacements.length
-          ? `Possible replacements: «${replacements}»\n`
-          : "") +
-        "\n\n"
-      );
-    },
-  },
+  markdown: markdownReporter,
+  githubactions: githubActionsReporter,
+  githubpr: githubReporter,
 };
 
-export function generateReport(
+export async function generateReport(
   result: LanguageToolResult,
   reporter = reporters.markdown
 ) {
@@ -71,33 +24,60 @@ export function generateReport(
 
   const place = location(result.contents);
 
-  matches.forEach((match) => {
+  for (const match of matches) {
     const { line = 1, column = 1 } = place.toPoint(match.offset);
 
-    const replacements = match.replacements.map((r) => r.value).join(", ");
+    const replacements = match.replacements.map((r) => r.value);
+
+    const annotatedText = result.annotatedText?.annotation.filter(
+      (t: any) => t.offset.start <= match.offset && t.offset.end > match.offset
+    )?.[0];
 
     const ctx = match.context;
+    let contextHighlighted;
+    if (annotatedText) {
+      const startHighlight = match.offset;
+      const endHighlight = Math.min(
+        annotatedText.offset.end,
+        match.offset + match.length
+      );
+      contextHighlighted = result.contents.slice(startHighlight, endHighlight);
+    } else {
+      contextHighlighted = ctx.text.slice(ctx.offset, ctx.offset + ctx.length);
+    }
+
     const contextPrefix = ctx.text.slice(0, ctx.offset);
     const contextPostfix = ctx.text.slice(
-      ctx.offset + ctx.length,
+      ctx.offset + contextHighlighted.length,
       ctx.text.length
     );
-    const contextHighlighted = ctx.text.slice(
-      ctx.offset,
-      ctx.offset + ctx.length
-    );
 
-    process.stdout.write(
-      reporter.issue(
-        result,
-        line,
-        column,
-        match.message.replace(/(\s{2})/g, ""),
-        contextHighlighted,
-        contextPrefix,
-        contextPostfix,
-        replacements
-      )
-    );
-  });
+    const isHighlightedCode =
+      contextHighlighted.startsWith("`") && contextHighlighted.endsWith("`");
+
+    const currentLine = result.contents.split("\n")[line - 1];
+    const suggestedLine = replacements.length
+      ? currentLine.slice(0, column - 1) +
+        (isHighlightedCode ? "`" + replacements[0] + "`" : replacements[0]) +
+        currentLine.slice(column - 1 + contextHighlighted.length)
+      : "";
+
+    const reportedIssue = reporter.issue({
+      result,
+      line,
+      column,
+      message: match.message.replace(/(\s{2})/g, ""),
+      contextHighlighted,
+      contextPrefix,
+      contextPostfix,
+      replacements,
+      suggestedLine,
+    });
+
+    if (typeof reportedIssue === "string") {
+      process.stdout.write(reportedIssue);
+    } else {
+      await reportedIssue;
+    }
+  }
 }

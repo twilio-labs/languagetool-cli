@@ -1,8 +1,8 @@
 import { Agent } from "https";
 import fetch, { Response } from "node-fetch";
-import { AnnotatedItem } from "./types.js";
+import { LoadFileResponse } from "./types.js";
 
-export function createFetchRequest(item: AnnotatedItem): Promise<Response> {
+export function createFetchRequest(item: LoadFileResponse): Promise<Response> {
   const params = {
     data: JSON.stringify(item.annotatedText),
     language: "en-US",

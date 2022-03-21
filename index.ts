@@ -1,33 +1,50 @@
-import ora from "ora";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 import { loadFiles } from "./lib/files.js";
 import { createFetchRequest } from "./lib/languageToolClient.js";
 import { generateReport, reporters } from "./lib/report.js";
 import { LanguageToolResult } from "./lib/types.js";
 import { convertMarkdownToAnnotated } from "./lib/markdownToAnnotated.js";
+import { getFilesFromPr } from "./lib/githubReporter.js";
 
-const spinner = ora("Processing...\n").start();
-run()
-  .then(() => {
-    spinner.succeed("Done!");
+const parser = yargs(hideBin(process.argv))
+  .usage("Usage: $0 [options] <file1> [<file2> ... <fileN>]")
+  .options({
+    githubactions: {
+      type: "boolean",
+      default: false,
+      describe: "Use GitHub Actions report format.",
+    },
+    githubpr: {
+      type: "string",
+      default: "",
+      nargs: 1,
+      describe:
+        "URL to a GitHub PR to add comments to. Requires GITHUB_TOKEN environment variable.",
+    },
   })
-  .catch((err) => {
-    spinner.fail("Error:");
-    console.error(err.message);
-  });
+  .help("h")
+  .alias("h", "help");
+
+run().catch((err) => {
+  console.error(err.message);
+  process.exit(1);
+});
 
 async function run() {
-  let nArgOffset = 2;
-  let gitHubActionsOutput = false;
+  const argv = await parser.argv;
+  const gitHubActionsOutput = argv.githubactions;
 
-  if (process.argv[nArgOffset].toLowerCase() === "--githubactions") {
-    nArgOffset++;
-    gitHubActionsOutput = true;
+  let filePathsToCheck = argv._ as string[];
+  if (argv.githubpr) {
+    filePathsToCheck = [
+      ...filePathsToCheck,
+      ...(await getFilesFromPr(argv.githubpr)),
+    ];
   }
-
-  const files = await loadFiles(process.argv.slice(2));
-
+  const files = await loadFiles(filePathsToCheck);
   const annotatedItems = files.map((file) => ({
-    file,
+    ...file,
     annotatedText: convertMarkdownToAnnotated(file.contents),
   }));
 
@@ -35,16 +52,22 @@ async function run() {
   const results = await Promise.all(responses.map((r) => r.json()));
   const correlatedResults: LanguageToolResult[] = results.map((r: any, i) => {
     return {
-      path: annotatedItems[i].file.path,
-      contents: annotatedItems[i].file.contents,
+      ...annotatedItems[i],
       matches: r.matches,
     };
   });
 
-  correlatedResults.forEach((result) => {
-    generateReport(
-      result,
-      gitHubActionsOutput ? reporters.githubactions : reporters.markdown
-    );
-  });
+  const reporter = gitHubActionsOutput
+    ? reporters.githubactions
+    : argv.githubpr
+    ? reporters.githubpr
+    : reporters.markdown;
+
+  for (const result of correlatedResults) {
+    await generateReport(result, reporter);
+  }
+
+  if (reporter.complete) {
+    await reporter.complete();
+  }
 }
