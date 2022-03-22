@@ -3,7 +3,12 @@ import { Agent } from "https";
 import fetch, { RequestInit, Response } from "node-fetch";
 import { LoadFileResponse } from "./types.js";
 
-function makeRequest(path: string, options: RequestInit): Promise<Response> {
+let version: string;
+
+async function makeRequest(
+  path: string,
+  options: RequestInit
+): Promise<Response> {
   if (process.env.LT_CLIENT_KEY) {
     const agentOptions = {
       key: process.env.LT_CLIENT_KEY,
@@ -14,6 +19,21 @@ function makeRequest(path: string, options: RequestInit): Promise<Response> {
     };
     options.agent = new Agent(agentOptions);
   }
+
+  if (!version) {
+    const json = JSON.parse(
+      await fs.readFile(new URL("../../package.json", import.meta.url), {
+        encoding: "utf-8",
+      })
+    );
+    version = json.version;
+  }
+
+  options.headers = {
+    Accepts: "application/json",
+    "User-Agent": "languagetool-cli v" + version,
+    ...options.headers,
+  };
 
   const url = (process.env.LT_URL ?? "https://api.languagetool.org/v2") + path;
   return fetch(url, options);
@@ -41,6 +61,7 @@ export function createFetchRequest(item: LoadFileResponse): Promise<Response> {
     data: JSON.stringify(item.annotatedText),
     language: "en-US",
     motherTongue: "en-US",
+    disabledRules: "WHITESPACE_RULE,CONSECUTIVE_SPACES",
   };
 
   const formBody = Object.keys(params)
@@ -53,7 +74,6 @@ export function createFetchRequest(item: LoadFileResponse): Promise<Response> {
   const options: RequestInit = {
     body: formBody,
     headers: {
-      Accepts: "application/json",
       "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
     },
     method: "POST",
