@@ -126,7 +126,11 @@ async function addCommentToPr(item: ReporterItem, options: ProgramOptions) {
       body:
         `${MAGIC_MARKER}\n${item.message}` +
         (item.suggestedLine
-          ? `\n\n\`\`\`suggestion\n${item.suggestedLine}\n\`\`\`\n`
+          ? `\n\n\`\`\`suggestion\n${item.suggestedLine}\n\`\`\`\n` +
+            (item.replacements.length > 1
+              ? "\n**Other suggestions:** " +
+                item.replacements.slice(1).join(", ")
+              : "")
           : ""),
     });
   } catch (err: any) {
