@@ -1,26 +1,34 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { loadFiles } from "./lib/files.js";
-import { createFetchRequest } from "./lib/languageToolClient.js";
+import {
+  loadCustomDict,
+  createFetchRequest,
+} from "./lib/languageToolClient.js";
 import { generateReport, reporters } from "./lib/report.js";
-import { LanguageToolResult } from "./lib/types.js";
+import { ProgramOptions, LanguageToolResult } from "./lib/types.js";
 import { convertMarkdownToAnnotated } from "./lib/markdownToAnnotated.js";
 import { getFilesFromPr } from "./lib/githubReporter.js";
 
 const parser = yargs(hideBin(process.argv))
-  .usage("Usage: $0 [options] <file1> [<file2> ... <fileN>]")
+  .usage("Usage: $0 [options] [<file1> <file2> ... <fileN>]")
   .options({
-    githubactions: {
-      type: "boolean",
-      default: false,
-      describe: "Use GitHub Actions report format.",
-    },
     githubpr: {
       type: "string",
       default: "",
       nargs: 1,
       describe:
         "URL to a GitHub PR to add comments to. Requires GITHUB_TOKEN environment variable.",
+    },
+    "pr-diff-only": {
+      type: "boolean",
+      default: false,
+      describe: "Only report issues on lines that are part of the PR's diff.",
+    },
+    "custom-dict-file": {
+      type: "string",
+      default: "",
+      describe: "A file containing a list of custom dictionary words.",
     },
   })
   .help("h")
@@ -32,14 +40,14 @@ run().catch((err) => {
 });
 
 async function run() {
-  const argv = await parser.argv;
-  const gitHubActionsOutput = argv.githubactions;
+  const options = (await parser.argv) as ProgramOptions;
+  options.customDict = await loadCustomDict(options["custom-dict-file"]);
 
-  let filePathsToCheck = argv._ as string[];
-  if (argv.githubpr) {
+  let filePathsToCheck = options._;
+  if (options.githubpr) {
     filePathsToCheck = [
       ...filePathsToCheck,
-      ...(await getFilesFromPr(argv.githubpr)),
+      ...(await getFilesFromPr(options.githubpr)),
     ];
   }
   const files = await loadFiles(filePathsToCheck);
@@ -57,17 +65,13 @@ async function run() {
     };
   });
 
-  const reporter = gitHubActionsOutput
-    ? reporters.githubactions
-    : argv.githubpr
-    ? reporters.githubpr
-    : reporters.markdown;
+  const reporter = options.githubpr ? reporters.githubpr : reporters.markdown;
 
   for (const result of correlatedResults) {
-    await generateReport(result, reporter);
+    await generateReport(result, reporter, options);
   }
 
   if (reporter.complete) {
-    await reporter.complete();
+    await reporter.complete(options);
   }
 }

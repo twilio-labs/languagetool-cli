@@ -1,6 +1,11 @@
 import { Octokit } from "octokit";
 import { OctokitOptions } from "@octokit/core/dist-types/types";
-import { LanguageToolResult, Reporter, ReporterItem } from "./types.js";
+import {
+  ProgramOptions,
+  LanguageToolResult,
+  Reporter,
+  ReporterItem,
+} from "./types.js";
 import { markdownReporter } from "./markdownReporter.js";
 
 const MAGIC_MARKER = "<!-- languagetool-cli -->";
@@ -108,7 +113,7 @@ export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
     .map((f) => f.filename);
 }
 
-async function addCommentToPr(item: ReporterItem) {
+async function addCommentToPr(item: ReporterItem, options: ProgramOptions) {
   try {
     await octokit.rest.pulls.createReviewComment({
       owner: pr.owner,
@@ -130,18 +135,20 @@ async function addCommentToPr(item: ReporterItem) {
         "pull_request_review_thread.line must be part of the diff"
       )
     ) {
-      prGeneralComment += markdownReporter.issue(item);
+      prGeneralComment += markdownReporter.issue(item, options);
     } else throw err;
   }
 }
 
 export const githubReporter: Reporter = {
-  noIssues: (result: LanguageToolResult) => {
-    prGeneralComment += markdownReporter.noIssues(result);
+  noIssues: (result: LanguageToolResult, options: ProgramOptions) => {
+    prGeneralComment += markdownReporter.noIssues(result, options);
     return "";
   },
   issue: addCommentToPr,
-  complete: async () => {
+  complete: async (options: ProgramOptions) => {
+    if (options["pr-diff-only"]) return;
+
     await octokit.rest.issues.createComment({
       owner: pr.owner,
       repo: pr.repo,

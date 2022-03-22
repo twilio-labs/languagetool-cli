@@ -1,3 +1,11 @@
+export interface ProgramOptions {
+  _: string[];
+  githubpr: string;
+  "pr-diff-only": boolean;
+  "custom-dict-file": string;
+  customDict?: string[];
+}
+
 export interface AnnotatedTextItemOffset {
   start: number;
   end: number;
@@ -76,7 +84,7 @@ export interface ReporterItem {
   suggestedLine: string;
 }
 export interface Reporter {
-  noIssues(result: LanguageToolResult): string;
-  issue(item: ReporterItem): string | Promise<void>;
-  complete?(): Promise<void>;
+  noIssues(result: LanguageToolResult, options: ProgramOptions): string;
+  issue(item: ReporterItem, options: ProgramOptions): string | Promise<void>;
+  complete?(options: ProgramOptions): Promise<void>;
 }

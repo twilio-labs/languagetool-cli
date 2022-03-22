@@ -1,24 +1,23 @@
 import { location } from "vfile-location";
-import { LanguageToolResult } from "./types.js";
+import { ProgramOptions, LanguageToolResult } from "./types.js";
 import { githubReporter } from "./githubReporter.js";
 import { markdownReporter } from "./markdownReporter.js";
-import { githubActionsReporter } from "./githubActionsReporter.js";
 
 export const reporters = {
   markdown: markdownReporter,
-  githubactions: githubActionsReporter,
   githubpr: githubReporter,
 };
 
 export async function generateReport(
   result: LanguageToolResult,
-  reporter = reporters.markdown
+  reporter = reporters.markdown,
+  options: ProgramOptions
 ) {
   const matches = result.matches;
   const matchesTotal = matches.length;
 
   if (!matchesTotal) {
-    process.stdout.write(reporter.noIssues(result));
+    process.stdout.write(reporter.noIssues(result, options));
     return;
   }
 
@@ -62,17 +61,28 @@ export async function generateReport(
         currentLine.slice(column - 1 + contextHighlighted.length)
       : "";
 
-    const reportedIssue = reporter.issue({
-      result,
-      line,
-      column,
-      message: match.message.replace(/(\s{2})/g, ""),
-      contextHighlighted,
-      contextPrefix,
-      contextPostfix,
-      replacements,
-      suggestedLine,
-    });
+    // Ignore spelling errors for words in our dictionary
+    if (
+      match.rule.issueType === "misspelling" &&
+      options.customDict?.includes(contextHighlighted.toLowerCase())
+    ) {
+      continue;
+    }
+
+    const reportedIssue = reporter.issue(
+      {
+        result,
+        line,
+        column,
+        message: match.message.replace(/(\s{2})/g, ""),
+        contextHighlighted,
+        contextPrefix,
+        contextPostfix,
+        replacements,
+        suggestedLine,
+      },
+      options
+    );
 
     if (typeof reportedIssue === "string") {
       process.stdout.write(reportedIssue);
