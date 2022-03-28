@@ -25,6 +25,12 @@ const parser = yargs(hideBin(process.argv))
       default: false,
       describe: "Only report issues on lines that are part of the PR's diff.",
     },
+    "max-suggestions": {
+      type: "number",
+      default: 5,
+      describe:
+        "Maximum number of PR suggestion comments to add to a PR. (Too many gets unwieldy.)",
+    },
     "custom-dict-file": {
       type: "string",
       default: "",
@@ -72,6 +78,6 @@ async function run() {
   }
 
   if (reporter.complete) {
-    await reporter.complete(options);
+    await reporter.complete(correlatedResults, options);
   }
 }

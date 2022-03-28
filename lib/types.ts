@@ -3,6 +3,7 @@ export interface ProgramOptions {
   githubpr: string;
   "pr-diff-only": boolean;
   "custom-dict-file": string;
+  "max-suggestions": number;
   customDict?: string[];
 }
 
@@ -66,6 +67,7 @@ export interface LanguageToolMatch {
   rule: LanguageToolRule;
   ignoreForIncompleteSentence: boolean;
   contextForSureMatch: number;
+  ignored?: boolean;
 }
 
 export interface LanguageToolResult extends LoadFileResponse {
@@ -82,9 +84,14 @@ export interface ReporterItem {
   contextPostfix: string;
   replacements: string[];
   suggestedLine: string;
+  currentLine: string;
+  match: LanguageToolMatch;
 }
 export interface Reporter {
   noIssues(result: LanguageToolResult, options: ProgramOptions): string;
   issue(item: ReporterItem, options: ProgramOptions): string | Promise<void>;
-  complete?(options: ProgramOptions): Promise<void>;
+  complete?(
+    results: LanguageToolResult[],
+    options: ProgramOptions
+  ): Promise<void>;
 }

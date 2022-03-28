@@ -9,28 +9,19 @@ export const markdownReporter: Reporter = {
   noIssues: (result: LanguageToolResult, options: ProgramOptions) => {
     return `- [X] **${result.path}** has no issues.\n\n`;
   },
-  issue: (
-    {
-      result,
-      line,
-      column,
-      message,
-      contextHighlighted,
-      contextPrefix,
-      contextPostfix,
-      replacements,
-    }: ReporterItem,
-    options: ProgramOptions
-  ) => {
+  issue: (item: ReporterItem, options: ProgramOptions) => {
     return (
-      `- [ ] **${result.path}** \`(${line},${column})\` - _${message}_\n\n` +
-      "  ```diff\n" +
-      `  - «${contextHighlighted}»\n` +
-      (replacements.length
-        ? `  + Possible replacements: «${replacements.join(", ")}»\n`
-        : "") +
-      `  # Context: «${contextPrefix}**${contextHighlighted}**${contextPostfix}»\n` +
-      "  ```\n\n"
+      `- [ ] **${item.result.path}** \`(${item.line},${item.column})\`\n${item.message} \`${item.contextHighlighted}\`` +
+      `\n\n   \`\`\`diff\n   - ${item.currentLine}\n` +
+      (item.suggestedLine
+        ? `   + ${item.suggestedLine}\n` +
+          (item.replacements.length > 1
+            ? "   ```\n   **Suggestion(s):** " + item.replacements.join(", ")
+            : "")
+        : item.match.rule.issueType === "misspelling"
+        ? "   ```\n   If this is code (like a variable name), try surrounding it with \\`backticks\\`."
+        : "   ```") +
+      "\n\n"
     );
   },
 };

@@ -5,6 +5,7 @@ import {
   LanguageToolResult,
   Reporter,
   ReporterItem,
+  LanguageToolMatch,
 } from "./types.js";
 import { markdownReporter } from "./markdownReporter.js";
 
@@ -113,7 +114,13 @@ export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
     .map((f) => f.filename);
 }
 
+let totalComments = 0;
 async function addCommentToPr(item: ReporterItem, options: ProgramOptions) {
+  if (totalComments >= options["max-suggestions"]) {
+    prGeneralComment += markdownReporter.issue(item, options);
+    return;
+  }
+
   try {
     await octokit.rest.pulls.createReviewComment({
       owner: pr.owner,
@@ -124,22 +131,27 @@ async function addCommentToPr(item: ReporterItem, options: ProgramOptions) {
       line: item.line,
       commit_id: prSha,
       body:
-        `${MAGIC_MARKER}\n${item.message}` +
+        `${MAGIC_MARKER}\n${item.message} \`${item.contextHighlighted}\`` +
         (item.suggestedLine
           ? `\n\n\`\`\`suggestion\n${item.suggestedLine}\n\`\`\`\n` +
             (item.replacements.length > 1
               ? "\n**Other suggestions:** " +
                 item.replacements.slice(1).join(", ")
               : "")
+          : item.match.rule.issueType === "misspelling"
+          ? "\nIf this is code (like a variable name), try surrounding it with \\`backticks\\`."
           : ""),
     });
+    totalComments += 1;
   } catch (err: any) {
     if (
       err.message.includes(
         "pull_request_review_thread.line must be part of the diff"
       )
     ) {
-      prGeneralComment += markdownReporter.issue(item, options);
+      if (!options["pr-diff-only"]) {
+        prGeneralComment += markdownReporter.issue(item, options);
+      }
     } else throw err;
   }
 }
@@ -150,14 +162,25 @@ export const githubReporter: Reporter = {
     return "";
   },
   issue: addCommentToPr,
-  complete: async (options: ProgramOptions) => {
-    if (options["pr-diff-only"]) return;
+  complete: async (results: LanguageToolResult[], options: ProgramOptions) => {
+    if (!prGeneralComment) return;
+
+    const totalMatches = results.reduce(
+      (p, r) => [...p, ...r.matches.filter((m) => !m.ignored)],
+      [] as LanguageToolMatch[]
+    ).length;
+    const additionalIssues = totalMatches - options["max-suggestions"];
 
     await octokit.rest.issues.createComment({
       owner: pr.owner,
       repo: pr.repo,
       issue_number: pr.pull_number,
-      body: `${MAGIC_MARKER}\n### Grammar issues not part of this PR's diff:\n\n${prGeneralComment}`,
+      body: `${MAGIC_MARKER}
+<details>
+<summary><h3>${additionalIssues} additional grammar issues found (click to expand)</h3></summary>
+
+${prGeneralComment}
+</details>`,
     });
   },
 };
