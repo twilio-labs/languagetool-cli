@@ -119,7 +119,7 @@ async function addCommentToPr(
   options: ProgramOptions,
   stats: ReportStats
 ) {
-  if (stats.getCounter(PR_COMMENT_COUNTER) >= options["max-suggestions"]) {
+  if (stats.getCounter(PR_COMMENT_COUNTER) >= options["max-pr-suggestions"]) {
     prGeneralComment += markdownReporter.issue(item, options, stats);
     return;
   }

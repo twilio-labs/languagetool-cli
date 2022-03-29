@@ -3,7 +3,7 @@ export interface ProgramOptions {
   githubpr: string;
   "pr-diff-only": boolean;
   "custom-dict-file": string;
-  "max-suggestions": number;
+  "max-pr-suggestions": number;
   customDict?: string[];
 }
 

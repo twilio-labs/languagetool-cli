@@ -29,7 +29,7 @@ const parser = yargs(hideBin(process.argv))
       default: false,
       describe: "Only report issues on lines that are part of the PR's diff.",
     },
-    "max-suggestions": {
+    "max-pr-suggestions": {
       type: "number",
       default: 5,
       describe:
