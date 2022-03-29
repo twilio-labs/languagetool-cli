@@ -6,7 +6,11 @@ import {
   createFetchRequest,
 } from "./lib/languageToolClient.js";
 import { generateReport, reporters } from "./lib/report.js";
-import { ProgramOptions, LanguageToolResult } from "./lib/types.js";
+import {
+  ProgramOptions,
+  LanguageToolResult,
+  ReportStats,
+} from "./lib/types.js";
 import { convertMarkdownToAnnotated } from "./lib/markdownToAnnotated.js";
 import { getFilesFromPr } from "./lib/githubReporter.js";
 
@@ -72,12 +76,13 @@ async function run() {
   });
 
   const reporter = options.githubpr ? reporters.githubpr : reporters.markdown;
+  const stats = new ReportStats();
 
   for (const result of correlatedResults) {
-    await generateReport(result, reporter, options);
+    await generateReport(result, reporter, options, stats);
   }
 
   if (reporter.complete) {
-    await reporter.complete(correlatedResults, options);
+    await reporter.complete(options, stats);
   }
 }

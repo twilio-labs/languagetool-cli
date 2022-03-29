@@ -2,13 +2,13 @@ import { Octokit } from "octokit";
 import { OctokitOptions } from "@octokit/core/dist-types/types";
 import {
   ProgramOptions,
-  LanguageToolResult,
   Reporter,
   ReporterItem,
-  LanguageToolMatch,
+  ReportStats,
 } from "./types.js";
-import { markdownReporter } from "./markdownReporter.js";
+import { markdownReporter, MARKDOWN_ITEM_COUNTER } from "./markdownReporter.js";
 
+const PR_COMMENT_COUNTER = "PR Comments";
 const MAGIC_MARKER = "<!-- languagetool-cli -->";
 
 interface GitHubPr {
@@ -114,11 +114,38 @@ export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
     .map((f) => f.filename);
 }
 
-let totalComments = 0;
-async function addCommentToPr(item: ReporterItem, options: ProgramOptions) {
-  if (totalComments >= options["max-suggestions"]) {
-    prGeneralComment += markdownReporter.issue(item, options);
+async function addCommentToPr(
+  item: ReporterItem,
+  options: ProgramOptions,
+  stats: ReportStats
+) {
+  if (stats.getCounter(PR_COMMENT_COUNTER) >= options["max-suggestions"]) {
+    prGeneralComment += markdownReporter.issue(item, options, stats);
     return;
+  }
+
+  const md: string[] = [];
+  md.push(MAGIC_MARKER);
+  md.push(`${item.message} \`${item.contextHighlighted}\``);
+  md.push("");
+  if (item.suggestedLine) {
+    md.push("```suggestion");
+    md.push(item.suggestedLine);
+    md.push("```");
+    md.push("");
+    if (item.replacements.length > 1) {
+      md.push(
+        "\n**Other suggestion(s):** " +
+          item.replacements
+            .slice(1)
+            .map((r) => "`" + r + "`")
+            .join(", ")
+      );
+    }
+  } else if (item.match.rule.issueType === "misspelling") {
+    md.push(
+      "If this is code (like a variable name), try surrounding it with \\`backticks\\`."
+    );
   }
 
   try {
@@ -130,19 +157,9 @@ async function addCommentToPr(item: ReporterItem, options: ProgramOptions) {
       side: "RIGHT",
       line: item.line,
       commit_id: prSha,
-      body:
-        `${MAGIC_MARKER}\n${item.message} \`${item.contextHighlighted}\`` +
-        (item.suggestedLine
-          ? `\n\n\`\`\`suggestion\n${item.suggestedLine}\n\`\`\`\n` +
-            (item.replacements.length > 1
-              ? "\n**Other suggestions:** " +
-                item.replacements.slice(1).join(", ")
-              : "")
-          : item.match.rule.issueType === "misspelling"
-          ? "\nIf this is code (like a variable name), try surrounding it with \\`backticks\\`."
-          : ""),
+      body: md.join("\n"),
     });
-    totalComments += 1;
+    stats.incrementCounter(PR_COMMENT_COUNTER);
   } catch (err: any) {
     if (
       err.message.includes(
@@ -150,26 +167,24 @@ async function addCommentToPr(item: ReporterItem, options: ProgramOptions) {
       )
     ) {
       if (!options["pr-diff-only"]) {
-        prGeneralComment += markdownReporter.issue(item, options);
+        prGeneralComment += markdownReporter.issue(item, options, stats);
       }
     } else throw err;
   }
 }
 
 export const githubReporter: Reporter = {
-  noIssues: (result: LanguageToolResult, options: ProgramOptions) => {
-    prGeneralComment += markdownReporter.noIssues(result, options);
+  noIssues: (result, options, stats) => {
+    prGeneralComment += markdownReporter.noIssues(result, options, stats);
     return "";
   },
   issue: addCommentToPr,
-  complete: async (results: LanguageToolResult[], options: ProgramOptions) => {
+  complete: async (options, stats) => {
     if (!prGeneralComment) return;
 
-    const totalMatches = results.reduce(
-      (p, r) => [...p, ...r.matches.filter((m) => !m.ignored)],
-      [] as LanguageToolMatch[]
-    ).length;
-    const additionalIssues = totalMatches - options["max-suggestions"];
+    const totalMarkdownItems = stats.getCounter(MARKDOWN_ITEM_COUNTER);
+    const additional =
+      totalMarkdownItems < stats.sumAllCounters() ? "additional " : "";
 
     await octokit.rest.issues.createComment({
       owner: pr.owner,
@@ -177,7 +192,7 @@ export const githubReporter: Reporter = {
       issue_number: pr.pull_number,
       body: `${MAGIC_MARKER}
 <details>
-<summary><h3>${additionalIssues} additional grammar issues found (click to expand)</h3></summary>
+<summary><h3>${totalMarkdownItems} ${additional}grammar issues found (click to expand)</h3></summary>
 
 ${prGeneralComment}
 </details>`,

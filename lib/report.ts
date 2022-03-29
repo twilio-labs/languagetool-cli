@@ -1,5 +1,5 @@
 import { location } from "vfile-location";
-import { ProgramOptions, LanguageToolResult } from "./types.js";
+import { ProgramOptions, LanguageToolResult, ReportStats } from "./types.js";
 import { githubReporter } from "./githubReporter.js";
 import { markdownReporter } from "./markdownReporter.js";
 
@@ -11,13 +11,14 @@ export const reporters = {
 export async function generateReport(
   result: LanguageToolResult,
   reporter = reporters.markdown,
-  options: ProgramOptions
+  options: ProgramOptions,
+  stats: ReportStats
 ) {
   const matches = result.matches;
   const matchesTotal = matches.length;
 
   if (!matchesTotal) {
-    process.stdout.write(reporter.noIssues(result, options));
+    process.stdout.write(reporter.noIssues(result, options, stats));
     return;
   }
 
@@ -84,7 +85,8 @@ export async function generateReport(
         currentLine,
         match,
       },
-      options
+      options,
+      stats
     );
 
     if (typeof reportedIssue === "string") {
