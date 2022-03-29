@@ -67,7 +67,6 @@ export interface LanguageToolMatch {
   rule: LanguageToolRule;
   ignoreForIncompleteSentence: boolean;
   contextForSureMatch: number;
-  ignored?: boolean;
 }
 
 export interface LanguageToolResult extends LoadFileResponse {

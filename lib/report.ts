@@ -67,7 +67,6 @@ export async function generateReport(
       match.rule.issueType === "misspelling" &&
       options.customDict?.includes(contextHighlighted.toLowerCase())
     ) {
-      match.ignored = true;
       continue;
     }
 
