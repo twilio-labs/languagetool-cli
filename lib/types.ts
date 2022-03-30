@@ -3,6 +3,7 @@ export interface ProgramOptions {
   githubpr: string;
   "pr-diff-only": boolean;
   "custom-dict-file": string;
+  "max-pr-suggestions": number;
   customDict?: string[];
 }
 
@@ -82,9 +83,36 @@ export interface ReporterItem {
   contextPostfix: string;
   replacements: string[];
   suggestedLine: string;
+  currentLine: string;
+  match: LanguageToolMatch;
 }
+
+export class ReportStats {
+  private counters: { [key: string]: number } = {};
+  incrementCounter(key: string): void {
+    this.counters[key] = this.getCounter(key) + 1;
+  }
+  getCounter(key: string): number {
+    return this.counters[key] ?? 0;
+  }
+  sumAllCounters(): number {
+    return Object.keys(this.counters).reduce(
+      (sum, key) => sum + this.getCounter(key),
+      0
+    );
+  }
+}
+
 export interface Reporter {
-  noIssues(result: LanguageToolResult, options: ProgramOptions): string;
-  issue(item: ReporterItem, options: ProgramOptions): string | Promise<void>;
-  complete?(options: ProgramOptions): Promise<void>;
+  noIssues(
+    result: LanguageToolResult,
+    options: ProgramOptions,
+    stats: ReportStats
+  ): string;
+  issue(
+    item: ReporterItem,
+    options: ProgramOptions,
+    stats: ReportStats
+  ): string | Promise<void>;
+  complete?(options: ProgramOptions, stats: ReportStats): Promise<void>;
 }
