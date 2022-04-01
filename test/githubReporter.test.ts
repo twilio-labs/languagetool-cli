@@ -53,7 +53,7 @@ test("issue with suggested line", async () => {
       path: "README.md",
       side: "RIGHT",
       line: 1,
-      commit_id: "25a0da5167d5150b5aba9d01035bf96d04c4cacf",
+      commit_id: prResponse.payload.head.sha,
       body: "<!-- languagetool-cli -->\nConsider a different word. `foo`\n\n```suggestion\nThe word is bar.\n```\n",
     })
     .reply(201, reviewResponse1.payload, reviewResponse1.headers);
@@ -64,6 +64,15 @@ test("issue with suggested line", async () => {
   expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(1);
 
   expect(nock.isDone()).toBeTruthy();
+});
+
+test("issue with suggested line, max suggestions", async () => {
+  f.fakeOptions["max-pr-suggestions"] = 0;
+
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(1);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(0);
 });
 
 test.run();

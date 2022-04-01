@@ -73,7 +73,7 @@ export async function getFakeResult(): Promise<FakeResult> {
   };
 
   const fakeOptions = {
-    _: markdownPaths,
+    _: ["README.md"],
     githubpr: "",
     "pr-diff-only": false,
     "max-pr-suggestions": 5,
