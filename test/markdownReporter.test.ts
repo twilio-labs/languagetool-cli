@@ -1,78 +1,33 @@
-import {
-  LoadFileResponse,
-  LanguageToolResult,
-  ProgramOptions,
-  ReportStats,
-  ReporterItem,
-  LanguageToolMatch,
-} from "../lib/types";
+import { suite } from "uvu";
+import expect from "expect";
 import {
   markdownReporter,
   MARKDOWN_ITEM_COUNTER,
-} from "../lib/markdownReporter";
-import { loadFiles } from "../lib/files";
-import { getMarkdownFixturePath } from "./testUtilities";
+} from "../lib/markdownReporter.js";
+import { FakeResult, getFakeResult } from "./testUtilities.js";
 
-describe("markdownReporter", () => {
-  const markdownPaths = [getMarkdownFixturePath()];
+const test = suite("markdownReporter");
 
-  let markdown: LoadFileResponse,
-    fakeResult: LanguageToolResult,
-    fakeOptions: ProgramOptions,
-    fakeStats: ReportStats,
-    fakeItem: ReporterItem;
+let f: FakeResult;
 
-  beforeEach(async () => {
-    markdown = (await loadFiles(markdownPaths))[0];
+test.before.each(async () => {
+  f = await getFakeResult();
+});
 
-    fakeResult = {
-      contents: markdown.contents,
-      path: markdown.path,
-      matches: [],
-      annotatedText: undefined,
-    };
+test("noIssue", () => {
+  const report = markdownReporter.noIssues(
+    f.fakeResult,
+    f.fakeOptions,
+    f.fakeStats
+  );
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
+  expect(report).toEqual(`- [X] **README.md** has no issues.\n\n`);
+});
 
-    fakeOptions = {
-      _: markdownPaths,
-      githubpr: "",
-      "pr-diff-only": false,
-      "max-pr-suggestions": 5,
-      "custom-dict-file": "",
-    };
-
-    fakeStats = new ReportStats();
-
-    fakeItem = {
-      column: 13,
-      contextHighlighted: "foo",
-      contextPrefix: "The word is ",
-      contextPostfix: ".",
-      currentLine: "The word is foo.",
-      line: 1,
-      match: undefined as any as LanguageToolMatch,
-      message: "Consider a different word.",
-      replacements: ["bar"],
-      result: fakeResult,
-      suggestedLine: "The word is bar.",
-    };
-  });
-
-  test("noIssue", () => {
-    const report = markdownReporter.noIssues(
-      fakeResult,
-      fakeOptions,
-      fakeStats
-    );
-    expect(fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
-    expect(report).toEqual(`- [X] **${markdown.path}** has no issues.\n\n`);
-  });
-
-  describe("issue", () => {
-    test("with suggested line", () => {
-      const report = markdownReporter.issue(fakeItem, fakeOptions, fakeStats);
-      expect(fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(1);
-      expect(report)
-        .toEqual(`**/Users/dprothero/Projects/languagetool-cli/test/fixtures/markdown/1.md** \`(1,13)\`
+test("issue with suggested line", () => {
+  const report = markdownReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(1);
+  expect(report).toEqual(`**README.md** \`(1,13)\`
 Consider a different word. \`foo\`
 
 \`\`\`diff
@@ -83,6 +38,38 @@ Consider a different word. \`foo\`
 
 ---
 `);
-    });
-  });
 });
+
+test("issue with no suggested line", () => {
+  f.fakeItem.suggestedLine = "";
+  const report = markdownReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(1);
+  expect(report).toEqual(`**README.md** \`(1,13)\`
+Consider a different word. \`foo\`
+
+\`\`\`diff
+- The word is foo.
+\`\`\`
+
+---
+`);
+});
+
+test("issue with no suggested line w/ misspelling", () => {
+  f.fakeItem.suggestedLine = "";
+  f.fakeMatch.rule.issueType = "misspelling";
+  const report = markdownReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(1);
+  expect(report).toEqual(`**README.md** \`(1,13)\`
+Consider a different word. \`foo\`
+
+\`\`\`diff
+- The word is foo.
+\`\`\`
+If this is code (like a variable name), try surrounding it with \\\`backticks\\\`.
+
+---
+`);
+});
+
+test.run();

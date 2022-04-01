@@ -8,8 +8,8 @@ import {
 } from "./types.js";
 import { markdownReporter, MARKDOWN_ITEM_COUNTER } from "./markdownReporter.js";
 
-const PR_COMMENT_COUNTER = "PR Comments";
-const MAGIC_MARKER = "<!-- languagetool-cli -->";
+export const PR_COMMENT_COUNTER = "PR Comments";
+export const MAGIC_MARKER = "<!-- languagetool-cli -->";
 
 interface GitHubPr {
   host: string;
@@ -52,10 +52,10 @@ let octokit: Octokit;
 let prSha: string;
 let prGeneralComment: string = "";
 
-export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
+export async function initializeOctokit(prUrlString: string): Promise<void> {
   pr = parsePrUrl(prUrlString);
-  const { host, owner, repo, pull_number } = pr;
-  octokit = getOctokit(host);
+  const { owner, repo, pull_number } = pr;
+  octokit = getOctokit(pr.host);
 
   const prData = await octokit.rest.pulls.get({
     owner,
@@ -63,6 +63,11 @@ export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
     pull_number,
   });
   prSha = prData.data.head.sha;
+}
+
+export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
+  initializeOctokit(prUrlString);
+  const { owner, repo, pull_number } = pr;
 
   // Remove old comments
   const generalComments = await octokit.rest.issues.listComments({
