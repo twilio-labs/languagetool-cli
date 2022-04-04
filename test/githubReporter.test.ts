@@ -19,6 +19,7 @@ const prResponse = getJSONFixture("github_api/get_pr_1.json");
 const reviewResponse1 = getJSONFixture("github_api/review_comment_1.json");
 
 test.before.each(async () => {
+  process.env.GITHUB_TOKEN = "123456";
   f = await getFakeResult();
   f.fakeOptions.githubpr = "https://github.com/dprothero/testing-ground/pull/1";
 
@@ -26,6 +27,36 @@ test.before.each(async () => {
     .get("/repos/dprothero/testing-ground/pulls/1")
     .reply(200, prResponse.payload, prResponse.headers);
   await initializeOctokit(f.fakeOptions.githubpr);
+});
+
+test("no github token", async () => {
+  process.env.GITHUB_TOKEN = "";
+  let error;
+  try {
+    await initializeOctokit("");
+  } catch (err: any) {
+    error = err.message;
+  }
+
+  expect(error).toEqual(
+    "No GITHUB_TOKEN environment variable specified. Cannot report to GitHub."
+  );
+});
+
+test("custom github enterprise host", async () => {
+  nock("https://github.enterprise.com:443", { encodedQueryParams: true })
+    .get("/api/v3/repos/some-org/some-repo/pulls/1")
+    .reply(200, prResponse.payload, prResponse.headers);
+  await initializeOctokit(
+    "https://github.enterprise.com/some-org/some-repo/pull/1"
+  );
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("nothing to report on complete", async () => {
+  expect(githubReporter.complete).toBeTruthy();
+  if (githubReporter.complete)
+    await githubReporter.complete(f.fakeOptions, f.fakeStats);
 });
 
 test("noIssue", async () => {
@@ -59,6 +90,139 @@ test("issue with suggested line", async () => {
     })
     .reply(201, reviewResponse1.payload, reviewResponse1.headers);
 
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(1);
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+const notPartOfDiff = {
+  message: "Validation Failed",
+  errors: [
+    {
+      resource: "PullRequestReviewComment",
+      code: "custom",
+      field: "pull_request_review_thread.line",
+      message: "pull_request_review_thread.line must be part of the diff",
+    },
+    {
+      resource: "PullRequestReviewComment",
+      code: "missing_field",
+      field: "pull_request_review_thread.diff_hunk",
+    },
+  ],
+  documentation_url: "https://docs.github.com/rest",
+};
+
+test("issue not part of diff", async () => {
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/pulls/1/comments", (postData) =>
+      postData.body.includes("```suggestion")
+    )
+    .reply(422, notPartOfDiff, reviewResponse1.headers);
+
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(1);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(0);
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("issue not part of diff, pr-diff-only", async () => {
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/pulls/1/comments", (postData) =>
+      postData.body.includes("```suggestion")
+    )
+    .reply(422, notPartOfDiff, reviewResponse1.headers);
+
+  f.fakeOptions["pr-diff-only"] = true;
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(0);
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("two issues, one suggestion, one general comment", async () => {
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/pulls/1/comments", (postData) =>
+      postData.body.includes("```suggestion")
+    )
+    .reply(201, reviewResponse1.payload, reviewResponse1.headers);
+
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(1);
+
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/pulls/1/comments", (postData) =>
+      postData.body.includes("```suggestion")
+    )
+    .reply(422, notPartOfDiff, reviewResponse1.headers);
+
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(1);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(1);
+
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/issues/1/comments", (postData) =>
+      postData.body.includes("1 additional")
+    )
+    .reply(201, commentResponse.payload, commentResponse.headers);
+
+  if (githubReporter.complete)
+    await githubReporter.complete(f.fakeOptions, f.fakeStats);
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("issue, some other github api error", async () => {
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/pulls/1/comments", (postData) =>
+      postData.body.includes("```suggestion")
+    )
+    .reply(
+      422,
+      {
+        message: "Validation Failed",
+        errors: [
+          {
+            resource: "PullRequestReviewComment",
+            code: "custom",
+            field: "pull_request_review_thread.line",
+            message: "some other error",
+          },
+        ],
+        documentation_url: "https://docs.github.com/rest",
+      },
+      reviewResponse1.headers
+    );
+
+  let error;
+  try {
+    await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+  } catch (err: any) {
+    error = err.message;
+  }
+  expect(error).toContain("some other error");
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("issue with suggested line, multiple suggestions", async () => {
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/pulls/1/comments", (postData) =>
+      postData.body.includes("**Other suggestion(s):** `other`")
+    )
+    .reply(201, reviewResponse1.payload, reviewResponse1.headers);
+
+  f.fakeItem.replacements.push("other");
   await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
 
   expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);

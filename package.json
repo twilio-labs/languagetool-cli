@@ -26,13 +26,14 @@
   "scripts": {
     "build": "tsc && echo \"#!/usr/bin/env node\" >./dist/run.js && cat ./dist/index.js >>./dist/run.js && chmod +x ./dist/run.js",
     "prepack": "yarn build",
-    "test": "ts-node-esm node_modules/uvu/bin.js test"
+    "test": "c8 ts-node-esm node_modules/uvu/bin.js test"
   },
   "devDependencies": {
     "@types/node": "^17.0.21",
     "@types/yargs": "^17.0.9",
     "@typescript-eslint/eslint-plugin": "^5.14.0",
     "@typescript-eslint/parser": "^5.14.0",
+    "c8": "^7.11.0",
     "eslint": "^8.10.0",
     "expect": "^27.5.1",
     "nock": "^13.2.4",

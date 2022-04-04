@@ -63,6 +63,7 @@ export async function initializeOctokit(prUrlString: string): Promise<void> {
     pull_number,
   });
   prSha = prData.data.head.sha;
+  prGeneralComment = "";
 }
 
 export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
@@ -70,12 +71,13 @@ export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
   const { owner, repo, pull_number } = pr;
 
   // Remove old comments
+  const deletePromises: Promise<any>[] = [];
   const generalComments = await octokit.rest.issues.listComments({
     owner,
     repo,
     issue_number: pull_number,
   });
-  const deletePromises: Promise<any>[] = [];
+
   for (const comment of generalComments.data.filter((c) =>
     c.body?.includes(MAGIC_MARKER)
   )) {
@@ -89,6 +91,7 @@ export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
     repo,
     pull_number,
   });
+
   for (const comment of reviewComments.data.filter((c) =>
     c.body?.includes(MAGIC_MARKER)
   )) {
