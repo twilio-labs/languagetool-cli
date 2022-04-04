@@ -12,6 +12,8 @@ test("invoke", async () => {
   const prComments = getJSONFixture("github_api/get_pr_comments.json");
   const prFiles = getJSONFixture("github_api/get_pr_files_1.json");
 
+  process.env.GITHUB_TOKEN = "123456";
+
   // It will fetch the PR
   nock("https://api.github.com:443", { encodedQueryParams: true })
     .get("/repos/dprothero/testing-ground/pulls/1")
