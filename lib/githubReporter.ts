@@ -67,7 +67,7 @@ export async function initializeOctokit(prUrlString: string): Promise<void> {
 }
 
 export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
-  initializeOctokit(prUrlString);
+  await initializeOctokit(prUrlString);
   const { owner, repo, pull_number } = pr;
 
   // Remove old comments
