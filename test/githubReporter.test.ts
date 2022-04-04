@@ -8,6 +8,7 @@ import {
 } from "../lib/githubReporter.js";
 import { MARKDOWN_ITEM_COUNTER } from "../lib/markdownReporter.js";
 import { getJSONFixture, FakeResult, getFakeResult } from "./testUtilities.js";
+import { MARKDOWN_RESPONSE } from "./markdownReporter.test.js";
 
 const test = suite("githubReporter");
 
@@ -66,13 +67,65 @@ test("issue with suggested line", async () => {
   expect(nock.isDone()).toBeTruthy();
 });
 
-test("issue with suggested line, max suggestions", async () => {
+test("issue without suggested line", async () => {
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/pulls/1/comments", {
+      path: "README.md",
+      side: "RIGHT",
+      line: 1,
+      commit_id: prResponse.payload.head.sha,
+      body: "<!-- languagetool-cli -->\nConsider a different word. `foo`\n",
+    })
+    .reply(201, reviewResponse1.payload, reviewResponse1.headers);
+
+  f.fakeItem.suggestedLine = "";
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(1);
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("issue without suggested line, misspelling", async () => {
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/pulls/1/comments", {
+      path: "README.md",
+      side: "RIGHT",
+      line: 1,
+      commit_id: prResponse.payload.head.sha,
+      body: "<!-- languagetool-cli -->\nConsider a different word. `foo`\n\nIf this is code (like a variable name), try surrounding it with \\`backticks\\`.",
+    })
+    .reply(201, reviewResponse1.payload, reviewResponse1.headers);
+
+  f.fakeItem.suggestedLine = "";
+  f.fakeItem.match.rule.issueType = "misspelling";
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(1);
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("issue hitting max suggestions", async () => {
   f.fakeOptions["max-pr-suggestions"] = 0;
 
   await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
 
   expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(1);
   expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(0);
+
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/issues/1/comments", (postData) =>
+      postData.body.includes(MARKDOWN_RESPONSE)
+    )
+    .reply(201, commentResponse.payload, commentResponse.headers);
+
+  if (githubReporter.complete)
+    await githubReporter.complete(f.fakeOptions, f.fakeStats);
+
+  expect(nock.isDone()).toBeTruthy();
 });
 
 test.run();

@@ -24,10 +24,7 @@ test("noIssue", () => {
   expect(report).toEqual(`- [X] **README.md** has no issues.\n\n`);
 });
 
-test("issue with suggested line", () => {
-  const report = markdownReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
-  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(1);
-  expect(report).toEqual(`**README.md** \`(1,13)\`
+export const MARKDOWN_RESPONSE = `**README.md** \`(1,13)\`
 Consider a different word. \`foo\`
 
 \`\`\`diff
@@ -37,7 +34,12 @@ Consider a different word. \`foo\`
 **Suggestion(s):** \`bar\`
 
 ---
-`);
+`;
+
+test("issue with suggested line", () => {
+  const report = markdownReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(1);
+  expect(report).toEqual(MARKDOWN_RESPONSE);
 });
 
 test("issue with no suggested line", () => {
