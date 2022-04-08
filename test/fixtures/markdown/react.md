@@ -6,6 +6,8 @@ import Partial from "./1.md";
 
 <Partial/>
 
+import { Do, Dont } from "@site/src/components/Instruction";
+
 Lorem markdownum hostibus Hesioneque in eque septem pressum? Per et dubium mihi
 gladio, matrisque fata querellis adest?
 

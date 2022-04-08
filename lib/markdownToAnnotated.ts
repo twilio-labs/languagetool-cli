@@ -7,7 +7,7 @@ export function convertMarkdownToAnnotated(markdownText: string) {
 
   // Remove JSX import statements
   for (const item of result.annotation) {
-    const expr = /import\s+?[\w_-]+?\s+?from\s+?["'].+?["']\s*?;/g;
+    const expr = /import\s+?.+?\s+?from\s+?["'].+?["']\s*?;/g;
     if (expr.test(item.text ?? "")) {
       item.interpretAs = "";
       item.markup = item.text;

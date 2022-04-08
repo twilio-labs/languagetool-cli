@@ -26,6 +26,15 @@ test("properly annotate Markdown for language checking", () => {
 
   // Check the React component is treated as markup
   expect(annotatedText.annotation[6].markup).toContain("<Partial/>");
+
+  expect(annotatedText.annotation[7].markup).toEqual(
+    'import { Do, Dont } from "@site/src/components/Instruction";'
+  );
+
+  expect(annotatedText.annotation[9].text).toEqual(
+    "Lorem markdownum hostibus Hesioneque in eque septem pressum? Per et dubium mihi\n" +
+      "gladio, matrisque fata querellis adest?"
+  );
 });
 
 test.run();
