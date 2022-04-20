@@ -1,17 +1,23 @@
 import { readFile } from "fs/promises";
-import { LoadFileResponse } from "./types.js";
+import { LoadFileResponse, FileWithDiffInfo } from "./types.js";
 
-function loadFile(path: string): Promise<LoadFileResponse | null> {
+function loadFile(
+  pathItem: string | FileWithDiffInfo
+): Promise<LoadFileResponse | null> {
+  const path = typeof pathItem === "string" ? pathItem : pathItem.filename;
+  const changedLines =
+    typeof pathItem === "string" ? undefined : pathItem.changedLines;
+
   return new Promise((resolve) => {
     readFile(path, { encoding: "utf-8" })
       .then((contents) => {
-        resolve({ contents, path });
+        resolve({ contents, path, changedLines });
       })
       .catch(() => resolve(null));
   });
 }
 
-export async function loadFiles(paths: string[]) {
+export async function loadFiles(paths: Array<string | FileWithDiffInfo>) {
   const responses = await Promise.all(paths.map((path) => loadFile(path)));
   return responses
     .filter((response) => !!response)

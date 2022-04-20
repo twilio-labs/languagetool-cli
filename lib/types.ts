@@ -27,6 +27,7 @@ export interface LoadFileResponse {
   contents: string;
   path: string;
   annotatedText?: AnnotatedText;
+  changedLines?: number[];
 }
 
 export interface LanguageToolReplacement {
@@ -115,4 +116,9 @@ export interface Reporter {
     stats: ReportStats
   ): string | Promise<void>;
   complete?(options: ProgramOptions, stats: ReportStats): Promise<void>;
+}
+
+export interface FileWithDiffInfo {
+  filename: string;
+  changedLines: number[];
 }

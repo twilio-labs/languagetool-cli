@@ -47,7 +47,7 @@ test("invoke", async () => {
     .delete("/repos/dprothero/testing-ground/pulls/comments/840961847")
     .reply(204, "", prResponse.headers);
 
-  // Finally it will getch the list of files modified by the PR
+  // Finally it will fetch the list of files modified by the PR
   nock("https://api.github.com:443", { encodedQueryParams: true })
     .get("/repos/dprothero/testing-ground/pulls/1/files")
     .reply(200, prFiles.payload, prFiles.headers);
@@ -56,7 +56,10 @@ test("invoke", async () => {
     "https://github.com/dprothero/testing-ground/pull/1"
   );
 
-  expect(files).toEqual(["README.md", "README.mdx"]);
+  expect(files).toEqual([
+    { filename: "README.md", changedLines: [1, 2] },
+    { filename: "README.mdx", changedLines: [1, 2] },
+  ]);
   expect(nock.isDone()).toBeTruthy();
 });
 

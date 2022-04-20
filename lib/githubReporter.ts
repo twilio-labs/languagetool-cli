@@ -5,8 +5,10 @@ import {
   Reporter,
   ReporterItem,
   ReportStats,
+  FileWithDiffInfo,
 } from "./types.js";
 import { markdownReporter, MARKDOWN_ITEM_COUNTER } from "./markdownReporter.js";
+import { getChangedLineNumbersFromPatch } from "./parseGitPatch.js";
 
 export const PR_COMMENT_COUNTER = "PR Comments";
 export const MAGIC_MARKER = "<!-- languagetool-cli -->";
@@ -51,22 +53,26 @@ let pr: GitHubPr;
 let octokit: Octokit;
 let prSha: string;
 let prGeneralComment: string = "";
+let reviewCommentApiCounter: number = 0;
 
 export async function initializeOctokit(prUrlString: string): Promise<void> {
   pr = parsePrUrl(prUrlString);
   const { owner, repo, pull_number } = pr;
   octokit = getOctokit(pr.host);
 
-  const prData = await octokit.rest.pulls.get({
+  const prResponse = await octokit.rest.pulls.get({
     owner,
     repo,
     pull_number,
   });
-  prSha = prData.data.head.sha;
+  prSha = prResponse.data.head.sha;
   prGeneralComment = "";
+  reviewCommentApiCounter = 0;
 }
 
-export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
+export async function getFilesFromPr(
+  prUrlString: string
+): Promise<FileWithDiffInfo[]> {
   await initializeOctokit(prUrlString);
   const { owner, repo, pull_number } = pr;
 
@@ -119,17 +125,35 @@ export async function getFilesFromPr(prUrlString: string): Promise<string[]> {
         (f.filename.toLowerCase().endsWith("md") ||
           f.filename.toLowerCase().endsWith("mdx"))
     )
-    .map((f) => f.filename);
+    .map((f) => ({
+      filename: f.filename,
+      changedLines: getChangedLineNumbersFromPatch(f.patch as string),
+    }));
 }
+
+const snooze = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 async function addCommentToPr(
   item: ReporterItem,
   options: ProgramOptions,
   stats: ReportStats
 ) {
-  if (stats.getCounter(PR_COMMENT_COUNTER) >= options["max-pr-suggestions"]) {
-    prGeneralComment += markdownReporter.issue(item, options, stats);
+  const counterPassed =
+    stats.getCounter(PR_COMMENT_COUNTER) >= options["max-pr-suggestions"];
+  const changeIsInDiff = item.result.changedLines?.includes(item.line);
+
+  if (counterPassed || !changeIsInDiff) {
+    if (changeIsInDiff || !options["pr-diff-only"]) {
+      prGeneralComment += markdownReporter.issue(item, options, stats);
+    }
     return;
+  }
+
+  reviewCommentApiCounter++;
+  if (reviewCommentApiCounter > 1) {
+    // GitHub recommends 1s between review comment calls
+    await snooze(1000);
   }
 
   const md: string[] = [];
@@ -155,6 +179,8 @@ async function addCommentToPr(
       "If this is code (like a variable name), try surrounding it with \\`backticks\\`."
     );
   }
+
+  // await snooze(1000);
 
   try {
     await octokit.rest.pulls.createReviewComment({

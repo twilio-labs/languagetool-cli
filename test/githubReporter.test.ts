@@ -1,6 +1,7 @@
 import { suite } from "uvu";
 import expect from "expect";
 import nock from "nock";
+import { performance } from "perf_hooks";
 import {
   initializeOctokit,
   githubReporter,
@@ -117,6 +118,27 @@ const notPartOfDiff = {
 };
 
 test("issue not part of diff", async () => {
+  f.fakeItem.result.changedLines = [];
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(1);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(0);
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("issue not part of diff, pr-diff-only", async () => {
+  f.fakeItem.result.changedLines = [];
+  f.fakeOptions["pr-diff-only"] = true;
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(0);
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("issue not part of diff from api", async () => {
   nock("https://api.github.com:443", { encodedQueryParams: true })
     .post("/repos/dprothero/testing-ground/pulls/1/comments", (postData) =>
       postData.body.includes("```suggestion")
@@ -131,7 +153,7 @@ test("issue not part of diff", async () => {
   expect(nock.isDone()).toBeTruthy();
 });
 
-test("issue not part of diff, pr-diff-only", async () => {
+test("issue not part of diff, pr-diff-only from api", async () => {
   nock("https://api.github.com:443", { encodedQueryParams: true })
     .post("/repos/dprothero/testing-ground/pulls/1/comments", (postData) =>
       postData.body.includes("```suggestion")
@@ -178,6 +200,38 @@ test("two issues, one suggestion, one general comment", async () => {
 
   if (githubReporter.complete)
     await githubReporter.complete(f.fakeOptions, f.fakeStats);
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("two suggestions with rate limiting between calls", async () => {
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/pulls/1/comments", (postData) =>
+      postData.body.includes("```suggestion")
+    )
+    .reply(201, reviewResponse1.payload, reviewResponse1.headers);
+
+  let startTime = performance.now();
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+  let endTime = performance.now();
+
+  expect(endTime - startTime).toBeLessThan(999);
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(1);
+
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/pulls/1/comments", (postData) =>
+      postData.body.includes("```suggestion")
+    )
+    .reply(201, reviewResponse1.payload, reviewResponse1.headers);
+
+  startTime = performance.now();
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+  endTime = performance.now();
+
+  expect(endTime - startTime).toBeGreaterThanOrEqual(1000);
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(2);
 
   expect(nock.isDone()).toBeTruthy();
 });
