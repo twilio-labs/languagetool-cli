@@ -180,8 +180,6 @@ async function addCommentToPr(
     );
   }
 
-  // await snooze(1000);
-
   try {
     await octokit.rest.pulls.createReviewComment({
       owner: pr.owner,
