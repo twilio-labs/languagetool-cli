@@ -10,7 +10,11 @@ const markdown2 = getMarkdownFixturePath("2");
 const markdown3 = getMarkdownFixturePath("3");
 
 test("loads three files", async () => {
-  const result = await loadFiles([markdown1, markdown2, markdown3]);
+  const result = await loadFiles([
+    markdown1,
+    markdown2,
+    { filename: markdown3, changedLines: [1, 2, 3] },
+  ]);
   expect(result.length).toEqual(3);
 
   expect(result[0].path).toEqual(markdown1);
@@ -30,6 +34,7 @@ test("loads three files", async () => {
     "# Manus signaque tradiderat sonus et Andraemon fraudes"
   );
   expect(result[2].annotatedText).toBeUndefined();
+  expect(result[2].changedLines).toEqual([1, 2, 3]);
 });
 
 test("loads one file, ignores bad path", async () => {

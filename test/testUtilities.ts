@@ -18,6 +18,16 @@ export function getMarkdownFixturePath(name: string = "1"): string {
   return path.resolve(__dirname, "fixtures", "markdown", name + ".md");
 }
 
+export function getPatchFixture(name: string = "1"): string {
+  const fullPath = path.resolve(
+    __dirname,
+    "fixtures",
+    "patches",
+    name + ".patch"
+  );
+  return fs.readFileSync(fullPath, { encoding: "utf8" });
+}
+
 export interface JSONFixture {
   payload: any;
   headers: string[];
@@ -70,6 +80,7 @@ export async function getFakeResult(): Promise<FakeResult> {
     path: "README.md",
     matches: [],
     annotatedText: undefined,
+    changedLines: [...markdown.contents.split("\n").keys()],
   };
 
   const fakeOptions = {

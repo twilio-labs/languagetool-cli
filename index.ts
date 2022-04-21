@@ -10,6 +10,7 @@ import {
   ProgramOptions,
   LanguageToolResult,
   ReportStats,
+  FileWithDiffInfo,
 } from "./lib/types.js";
 import { convertMarkdownToAnnotated } from "./lib/markdownToAnnotated.js";
 import { getFilesFromPr } from "./lib/githubReporter.js";
@@ -53,7 +54,7 @@ async function run() {
   const options = (await parser.argv) as ProgramOptions;
   options.customDict = await loadCustomDict(options["custom-dict-file"]);
 
-  let filePathsToCheck = options._;
+  let filePathsToCheck: Array<string | FileWithDiffInfo> = options._;
   if (options.githubpr) {
     filePathsToCheck = [
       ...filePathsToCheck,
