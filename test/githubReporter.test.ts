@@ -354,7 +354,7 @@ test("all comments too large for github", async () => {
     currentLine: "The word is fee.",
   };
   const fakeMarkdownItem1 = MARKDOWN_RESPONSE;
-  const fakeMarkdownItem2 = MARKDOWN_RESPONSE.replaceAll("foo", "fee");
+  const fakeMarkdownItem2 = MARKDOWN_RESPONSE.replace(/foo/g, "fee");
 
   f.fakeOptions["max-pr-suggestions"] = 0;
 
