@@ -88,6 +88,7 @@ export async function getFakeResult(): Promise<FakeResult> {
     githubpr: "",
     "pr-diff-only": false,
     "max-pr-suggestions": 5,
+    "max-replacements": 5,
     "custom-dict-file": "",
   };
 

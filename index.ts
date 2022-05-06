@@ -41,6 +41,12 @@ const parser = yargs(hideBin(process.argv))
       default: "",
       describe: "A file containing a list of custom dictionary words.",
     },
+    "max-replacements": {
+      type: "number",
+      default: 5,
+      describe:
+        "Maximum number of replacements to suggest for a grammar/spelling error.",
+    },
   })
   .help("h")
   .alias("h", "help");

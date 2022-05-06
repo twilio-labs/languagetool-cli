@@ -27,7 +27,13 @@ export async function generateReport(
   for (const match of matches) {
     const { line = 1, column = 1 } = place.toPoint(match.offset);
 
-    const replacements = match.replacements.map((r) => r.value);
+    let replacements = match.replacements.map((r) => r.value);
+    if (replacements.length > options["max-replacements"]) {
+      replacements = [
+        ...replacements.slice(0, options["max-replacements"]),
+        `(${replacements.length - options["max-replacements"]} more)`,
+      ];
+    }
 
     const annotatedText = result.annotatedText?.annotation.filter(
       (t: any) => t.offset.start <= match.offset && t.offset.end > match.offset
