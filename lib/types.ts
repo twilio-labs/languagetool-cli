@@ -4,6 +4,7 @@ export interface ProgramOptions {
   "pr-diff-only": boolean;
   "custom-dict-file": string;
   "max-pr-suggestions": number;
+  "max-replacements": number;
   customDict?: string[];
 }
 
