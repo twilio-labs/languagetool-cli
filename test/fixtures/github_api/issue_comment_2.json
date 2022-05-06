@@ -1,0 +1,40 @@
+{
+  "payload": {
+    "message": "Validation Failed",
+    "errors": [
+      {
+        "resource": "IssueComment",
+        "code": "unprocessable",
+        "field": "data",
+        "message": "Body is too long (maximum is 65536 characters)"
+      }
+    ],
+    "documentation_url": "https://docs.github.com/rest/reference/issues#create-an-issue-comment"
+  },
+  "headers": {
+    "access-control-allow-origin": "*",
+    "access-control-expose-headers": "ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset",
+    "connection": "close",
+    "content-length": "259",
+    "content-security-policy": "default-src 'none'",
+    "content-type": "application/json; charset=utf-8",
+    "date": "Fri, 06 May 2022 17:52:13 GMT",
+    "github-authentication-token-expiration": "2022-05-20 17:54:29 UTC",
+    "referrer-policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+    "server": "GitHub.com",
+    "strict-transport-security": "max-age=31536000; includeSubdomains; preload",
+    "vary": "Accept-Encoding, Accept, X-Requested-With",
+    "x-accepted-oauth-scopes": "",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "deny",
+    "x-github-media-type": "github.v3; format=json",
+    "x-github-request-id": "E67C:0446:15B195:1770D7:6275604C",
+    "x-oauth-scopes": "repo",
+    "x-ratelimit-limit": "5000",
+    "x-ratelimit-remaining": "4971",
+    "x-ratelimit-reset": "1651862056",
+    "x-ratelimit-resource": "core",
+    "x-ratelimit-used": "29",
+    "x-xss-protection": "0"
+  }
+}
