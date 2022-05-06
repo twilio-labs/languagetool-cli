@@ -52,7 +52,7 @@ function getOctokit(host: string): Octokit {
 let pr: GitHubPr;
 let octokit: Octokit;
 let prSha: string;
-let prGeneralComment: string = "";
+let prGeneralComments: string[] = [];
 let reviewCommentApiCounter: number = 0;
 
 export async function initializeOctokit(prUrlString: string): Promise<void> {
@@ -66,7 +66,7 @@ export async function initializeOctokit(prUrlString: string): Promise<void> {
     pull_number,
   });
   prSha = prResponse.data.head.sha;
-  prGeneralComment = "";
+  prGeneralComments = [];
   reviewCommentApiCounter = 0;
 }
 
@@ -145,7 +145,9 @@ async function addCommentToPr(
 
   if (counterPassed || !changeIsInDiff) {
     if (changeIsInDiff || !options["pr-diff-only"]) {
-      prGeneralComment += markdownReporter.issue(item, options, stats);
+      prGeneralComments.push(
+        markdownReporter.issue(item, options, stats) as string
+      );
     }
     return;
   }
@@ -199,35 +201,91 @@ async function addCommentToPr(
       )
     ) {
       if (!options["pr-diff-only"]) {
-        prGeneralComment += markdownReporter.issue(item, options, stats);
+        prGeneralComments.push(
+          markdownReporter.issue(item, options, stats) as string
+        );
       }
     } else throw err;
   }
 }
 
+function fillCommentTemplate(vars: {
+  numItems: number;
+  additional: string;
+  comment: string;
+}) {
+  const templateString = `${MAGIC_MARKER}
+<details>
+<summary><h3>\${this.numItems} \${this.additional}grammar issues found (click to expand)</h3></summary>
+
+\${this.comment}
+</details>`;
+  return new Function("return `" + templateString + "`;").call(vars);
+}
+
 export const githubReporter: Reporter = {
   noIssues: (result, options, stats) => {
-    prGeneralComment += markdownReporter.noIssues(result, options, stats);
+    prGeneralComments.push(
+      markdownReporter.noIssues(result, options, stats) as string
+    );
     return "";
   },
   issue: addCommentToPr,
   complete: async (options, stats) => {
-    if (!prGeneralComment) return;
+    if (!prGeneralComments.length) return;
 
     const totalMarkdownItems = stats.getCounter(MARKDOWN_ITEM_COUNTER);
     const additional =
       totalMarkdownItems < stats.sumAllCounters() ? "additional " : "";
 
+    await attemptCreateComment(
+      totalMarkdownItems,
+      additional,
+      prGeneralComments
+    );
+  },
+};
+
+async function attemptCreateComment(
+  numItems: number,
+  additional: string,
+  comments: string[]
+) {
+  const result = await createComment(numItems, additional, comments.join("\n"));
+  if (result === "too_long") {
+    if (comments.length < 2) {
+      throw new Error("The comment is too long for GitHub.");
+    }
+    const half = Math.ceil(comments.length / 2);
+    const firstHalf = comments.slice(0, half);
+    const secondHalf = comments.slice(-half);
+    await attemptCreateComment(firstHalf.length, additional, firstHalf);
+    await attemptCreateComment(secondHalf.length, "additional ", secondHalf);
+  }
+}
+
+async function createComment(
+  numItems: number,
+  additional: string,
+  comment: string
+): Promise<string> {
+  try {
     await octokit.rest.issues.createComment({
       owner: pr.owner,
       repo: pr.repo,
       issue_number: pr.pull_number,
-      body: `${MAGIC_MARKER}
-<details>
-<summary><h3>${totalMarkdownItems} ${additional}grammar issues found (click to expand)</h3></summary>
-
-${prGeneralComment}
-</details>`,
+      body: fillCommentTemplate({
+        numItems,
+        additional,
+        comment,
+      }),
     });
-  },
-};
+  } catch (err) {
+    const message = (err as any)?.response?.data?.errors?.[0]?.message;
+    if (message.startsWith("Body is too long")) {
+      return "too_long";
+    }
+    throw err;
+  }
+  return "ok";
+}

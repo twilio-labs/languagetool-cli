@@ -16,6 +16,7 @@ const test = suite("githubReporter");
 let f: FakeResult;
 
 const commentResponse = getJSONFixture("github_api/issue_comment_1.json");
+const commentResponseTooBig = getJSONFixture("github_api/issue_comment_2.json");
 const prResponse = getJSONFixture("github_api/get_pr_1.json");
 const reviewResponse1 = getJSONFixture("github_api/review_comment_1.json");
 
@@ -342,6 +343,115 @@ test("issue hitting max suggestions", async () => {
 
   if (githubReporter.complete)
     await githubReporter.complete(f.fakeOptions, f.fakeStats);
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("all comments too large for github", async () => {
+  const fakeItem2 = {
+    ...f.fakeItem,
+    contextHighlighted: "fee",
+    currentLine: "The word is fee.",
+  };
+  const fakeMarkdownItem1 = MARKDOWN_RESPONSE;
+  const fakeMarkdownItem2 = MARKDOWN_RESPONSE.replace(/foo/g, "fee");
+
+  f.fakeOptions["max-pr-suggestions"] = 0;
+
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+  await githubReporter.issue(fakeItem2, f.fakeOptions, f.fakeStats);
+
+  expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(2);
+  expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(0);
+
+  // First request fails
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post(
+      "/repos/dprothero/testing-ground/issues/1/comments",
+      (postData) =>
+        postData.body.includes(fakeMarkdownItem1) &&
+        postData.body.includes(fakeMarkdownItem2)
+    )
+    .reply(422, commentResponseTooBig.payload, commentResponseTooBig.headers);
+
+  // Now we should get two separate requests, one for each comment
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post(
+      "/repos/dprothero/testing-ground/issues/1/comments",
+      (postData) =>
+        postData.body.includes(fakeMarkdownItem1) &&
+        !postData.body.includes(fakeMarkdownItem2)
+    )
+    .reply(201, commentResponse.payload, commentResponse.headers);
+
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post(
+      "/repos/dprothero/testing-ground/issues/1/comments",
+      (postData) =>
+        !postData.body.includes(fakeMarkdownItem1) &&
+        postData.body.includes(fakeMarkdownItem2)
+    )
+    .reply(201, commentResponse.payload, commentResponse.headers);
+
+  if (githubReporter.complete)
+    await githubReporter.complete(f.fakeOptions, f.fakeStats);
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("one comment too large for github", async () => {
+  f.fakeOptions["max-pr-suggestions"] = 0;
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/issues/1/comments", (postData) =>
+      postData.body.includes(MARKDOWN_RESPONSE)
+    )
+    .reply(422, commentResponseTooBig.payload, commentResponseTooBig.headers);
+
+  let message = "";
+  if (githubReporter.complete) {
+    try {
+      await githubReporter.complete(f.fakeOptions, f.fakeStats);
+    } catch (err) {
+      message = (err as any).message;
+    }
+  }
+  expect(message).toEqual("The comment is too long for GitHub.");
+
+  expect(nock.isDone()).toBeTruthy();
+});
+
+test("other github error posting comment", async () => {
+  f.fakeOptions["max-pr-suggestions"] = 0;
+  await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
+
+  nock("https://api.github.com:443", { encodedQueryParams: true })
+    .post("/repos/dprothero/testing-ground/issues/1/comments", (postData) =>
+      postData.body.includes(MARKDOWN_RESPONSE)
+    )
+    .reply(
+      422,
+      {
+        ...commentResponseTooBig.payload,
+        errors: [
+          {
+            message: "Something else bad happened",
+          },
+        ],
+      },
+      commentResponseTooBig.headers
+    );
+
+  let message = "";
+  if (githubReporter.complete) {
+    try {
+      await githubReporter.complete(f.fakeOptions, f.fakeStats);
+    } catch (err) {
+      message = (err as any).message;
+    }
+  }
+  expect(message.startsWith("Validation Failed")).toBeTruthy();
 
   expect(nock.isDone()).toBeTruthy();
 });
