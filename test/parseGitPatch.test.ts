@@ -33,4 +33,14 @@ test("invalid input", () => {
   expect(results).toEqual([]);
 });
 
+test("undefined input", () => {
+  const results = getChangedLineNumbersFromPatch(undefined as any);
+  expect(results).toEqual([]);
+});
+
+test("null input", () => {
+  const results = getChangedLineNumbersFromPatch(null as any);
+  expect(results).toEqual([]);
+});
+
 test.run();

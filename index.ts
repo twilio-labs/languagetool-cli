@@ -53,6 +53,7 @@ const parser = yargs(hideBin(process.argv))
 
 run().catch((err) => {
   console.error(err.message);
+  console.debug(err);
   process.exit(1);
 });
 

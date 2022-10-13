@@ -117,3 +117,15 @@ export async function getFakeResult(): Promise<FakeResult> {
     fakeStats,
   };
 }
+
+export const MARKDOWN_RESPONSE = `**README.md** \`(1,13)\`
+Consider a different word. \`foo\`
+
+\`\`\`diff
+- The word is foo.
++ The word is bar.
+\`\`\`
+**Suggestion(s):** \`bar\`
+
+---
+`;
