@@ -2,6 +2,8 @@ export function getChangedLineNumbersFromPatch(patch: string): number[] {
   const fileLinesRegex = /^@@ -([0-9]*),?\S* \+([0-9]*),?/;
   const lineNumbersInDiff: number[] = [];
 
+  if (!patch) return [];
+
   splitIntoParts(patch.split("\n"), "@@ ").forEach((lines) => {
     const fileLinesLine = lines.shift() as string;
     const matches = fileLinesLine.match(fileLinesRegex);
