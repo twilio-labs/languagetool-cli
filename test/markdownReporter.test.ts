@@ -4,7 +4,11 @@ import {
   markdownReporter,
   MARKDOWN_ITEM_COUNTER,
 } from "../lib/markdownReporter.js";
-import { FakeResult, getFakeResult } from "./testUtilities.js";
+import {
+  FakeResult,
+  getFakeResult,
+  MARKDOWN_RESPONSE,
+} from "./testUtilities.js";
 
 const test = suite("markdownReporter");
 
@@ -23,18 +27,6 @@ test("noIssue", () => {
   expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
   expect(report).toEqual(`- [X] **README.md** has no issues.\n\n`);
 });
-
-export const MARKDOWN_RESPONSE = `**README.md** \`(1,13)\`
-Consider a different word. \`foo\`
-
-\`\`\`diff
-- The word is foo.
-+ The word is bar.
-\`\`\`
-**Suggestion(s):** \`bar\`
-
----
-`;
 
 test("issue with suggested line", () => {
   const report = markdownReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);

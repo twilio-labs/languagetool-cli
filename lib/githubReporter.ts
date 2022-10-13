@@ -1,5 +1,6 @@
 import { Octokit } from "octokit";
 import { OctokitOptions } from "@octokit/core/dist-types/types";
+import { snooze, SnoozeFunc } from "./snooze.js";
 import {
   ProgramOptions,
   Reporter,
@@ -9,6 +10,8 @@ import {
 } from "./types.js";
 import { markdownReporter, MARKDOWN_ITEM_COUNTER } from "./markdownReporter.js";
 import { getChangedLineNumbersFromPatch } from "./parseGitPatch.js";
+
+let snoozeFunc = snooze;
 
 export const PR_COMMENT_COUNTER = "PR Comments";
 export const MAGIC_MARKER = "<!-- languagetool-cli -->";
@@ -55,7 +58,10 @@ let prSha: string;
 let prGeneralComments: string[] = [];
 let reviewCommentApiCounter: number = 0;
 
-export async function initializeOctokit(prUrlString: string): Promise<void> {
+export async function initializeOctokit(
+  prUrlString: string,
+  overrideSnooze?: SnoozeFunc
+): Promise<void> {
   pr = parsePrUrl(prUrlString);
   const { owner, repo, pull_number } = pr;
   octokit = getOctokit(pr.host);
@@ -68,6 +74,7 @@ export async function initializeOctokit(prUrlString: string): Promise<void> {
   prSha = prResponse.data.head.sha;
   prGeneralComments = [];
   reviewCommentApiCounter = 0;
+  snoozeFunc = overrideSnooze ?? snooze;
 }
 
 export async function getFilesFromPr(
@@ -131,9 +138,6 @@ export async function getFilesFromPr(
     }));
 }
 
-const snooze = (ms: number) =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-
 async function addCommentToPr(
   item: ReporterItem,
   options: ProgramOptions,
@@ -155,7 +159,7 @@ async function addCommentToPr(
   reviewCommentApiCounter++;
   if (reviewCommentApiCounter > 1) {
     // GitHub recommends 1s between review comment calls
-    await snooze(1000);
+    await snoozeFunc(1000);
   }
 
   const md: string[] = [];

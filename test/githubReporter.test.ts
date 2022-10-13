@@ -1,15 +1,20 @@
 import { suite } from "uvu";
+import sinon from "sinon";
 import expect from "expect";
 import nock from "nock";
-import { performance } from "perf_hooks";
 import {
   initializeOctokit,
   githubReporter,
   PR_COMMENT_COUNTER,
 } from "../lib/githubReporter.js";
 import { MARKDOWN_ITEM_COUNTER } from "../lib/markdownReporter.js";
-import { getJSONFixture, FakeResult, getFakeResult } from "./testUtilities.js";
-import { MARKDOWN_RESPONSE } from "./markdownReporter.test.js";
+import {
+  getJSONFixture,
+  FakeResult,
+  getFakeResult,
+  MARKDOWN_RESPONSE,
+} from "./testUtilities.js";
+import { SnoozeFunc } from "../lib/snooze.js";
 
 const test = suite("githubReporter");
 
@@ -20,6 +25,12 @@ const commentResponseTooBig = getJSONFixture("github_api/issue_comment_2.json");
 const prResponse = getJSONFixture("github_api/get_pr_1.json");
 const reviewResponse1 = getJSONFixture("github_api/review_comment_1.json");
 
+const snoozeFunc: SnoozeFunc = sinon.fake((ms: number) => {
+  console.debug(`Fake snoozing for ${ms}ms...`);
+  return new Promise((resolve) => setTimeout(resolve, 1));
+});
+let snoozeStub: sinon.SinonStub;
+
 test.before.each(async () => {
   process.env.GITHUB_TOKEN = "123456";
   f = await getFakeResult();
@@ -28,7 +39,9 @@ test.before.each(async () => {
   nock("https://api.github.com:443", { encodedQueryParams: true })
     .get("/repos/dprothero/testing-ground/pulls/1")
     .reply(200, prResponse.payload, prResponse.headers);
-  await initializeOctokit(f.fakeOptions.githubpr);
+
+  snoozeStub = sinon.stub().callsFake(snoozeFunc);
+  await initializeOctokit(f.fakeOptions.githubpr, snoozeStub);
 });
 
 test("no github token", async () => {
@@ -212,11 +225,8 @@ test("two suggestions with rate limiting between calls", async () => {
     )
     .reply(201, reviewResponse1.payload, reviewResponse1.headers);
 
-  let startTime = performance.now();
   await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
-  let endTime = performance.now();
-
-  expect(endTime - startTime).toBeLessThan(999);
+  expect(snoozeStub.called).toBeFalsy();
   expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
   expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(1);
 
@@ -226,11 +236,9 @@ test("two suggestions with rate limiting between calls", async () => {
     )
     .reply(201, reviewResponse1.payload, reviewResponse1.headers);
 
-  startTime = performance.now();
   await githubReporter.issue(f.fakeItem, f.fakeOptions, f.fakeStats);
-  endTime = performance.now();
 
-  expect(endTime - startTime).toBeGreaterThanOrEqual(1000);
+  expect(snoozeStub.called).toBeTruthy();
   expect(f.fakeStats.getCounter(MARKDOWN_ITEM_COUNTER)).toEqual(0);
   expect(f.fakeStats.getCounter(PR_COMMENT_COUNTER)).toEqual(2);
 
