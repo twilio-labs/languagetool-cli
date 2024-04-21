@@ -31,5 +31,5 @@ languagetool-cli sample.md > output.md
 If you would like to use a different URL for the LanguageTool service, set the `LT_URL` environment variable like so:
 
 ```sh
-export LT_URL="http://localhost:8081/v2/check"
+export LT_URL="http://localhost:8081/v2"
 ```
